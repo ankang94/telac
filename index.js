@@ -2,6 +2,7 @@ const pty = require('node-pty');
 const { Subject } = require('rxjs');
 const { program } = require('commander');
 const inquirer = require('inquirer');
+const ansiEscapes = require('ansi-escapes');
 
 const configs = {
     sw1: '192.168.10.1',
@@ -39,36 +40,35 @@ let killdev = {
 
 let prompts = new Subject();
 
-let obv;
+let obv = inquirer.prompt(prompts);
 
-function welcome() {
-    obv = inquirer.createPromptModule()(prompts);
-    
-    obv.ui.process.subscribe(function (answer) {
-        if (answer.name === 'device' && answer.answer === 'kill') {
-            prompts.next(killdev);
-        } else if (answer.name === 'killdev') {
-            setTimeout(function () {
-                prompts.next(devices);
-            }, 2000);
-        } else {
-            obv.ui.rl.output.mute();
-            connect(answer.answer);
-        }
-    }, function (error) {
-        console.log(error)
-    }, function () {
-        
-    });
-    
-    obv.ui.rl.listeners("SIGINT").forEach(listener => obv.ui.rl.off("SIGINT", listener));
-    obv.ui.rl.on("SIGINT", ()=>{});
-    obv.ui.rl.on("SIGTSTP", ()=>{});
+obv.ui.process.subscribe(function (answer) {
+    if (answer.name === 'device' && answer.answer === 'kill') {
+        obv.ui.rl.output.write(ansiEscapes.eraseLines(200));
+        prompts.next(killdev);
+    } else if (answer.name === 'killdev') {
+        obv.ui.rl.output.write(ansiEscapes.eraseLines(200));
+        console.log(`killing ${answer.answer}, please wait...`);
+        setTimeout(function () {
+            obv.ui.rl.output.write(ansiEscapes.eraseLines(200));
+            prompts.next(devices);
+        }, 2000);
+    } else {
+        obv.ui.rl.output.mute();
+        connect(answer.answer);
+    }
+}, function (error) {
+    console.log(error)
+}, function () {
 
-    prompts.next(devices);
-}
+});
 
-welcome();
+obv.ui.rl.listeners("SIGINT").forEach(listener => obv.ui.rl.off("SIGINT", listener));
+obv.ui.rl.on("SIGINT", () => {});
+obv.ui.rl.on("SIGTSTP", () => {});
+
+obv.ui.rl.output.write(ansiEscapes.eraseLines(200));
+prompts.next(devices);
 
 function connect(name) {
 
@@ -80,8 +80,9 @@ function connect(name) {
         env: process.env
     });
 
-    ptyProcess.on('exit', function (code) {
+    ptyProcess.on('exit', function () {
         obv.ui.rl.output.unmute();
+        obv.ui.rl.output.write(ansiEscapes.eraseLines(200));
         prompts.next(devices);
     });
 
