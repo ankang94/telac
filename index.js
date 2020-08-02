@@ -16,7 +16,7 @@ function welcome() {
     output += '  |    |_/ __ \\|  |  /    \\_/ __ \\   __\\         \n';
     output += '  |    |\\  ___/|  |_|   |  \\  ___/|  |             \n';
     output += '  |____| \\___  >____/___|  /\\___  >__|             \n';
-    output += `             \\/          \\/     \\/     --- H AC CD\n`;
+    output += `             \\/          \\/     \\/     --- HAC:${program.user}\n`;
     console.log(output);
 }
 
@@ -29,7 +29,7 @@ program.parse(process.argv);
 let devices = {
     type: 'list',
     name: 'device',
-    message: `Which devic do you(${program.user}) want to connect?`,
+    message: `Which devic do you want to connect?`,
     askAnswered: true,
     choices: [
         'sw1',
