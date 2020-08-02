@@ -11,12 +11,12 @@ const configs = {
 
 function welcome() {
     let output = '\n';
-    output += '___________    .__                 __        \n';
-    output += '\\__    ___/___ |  |   ____   _____/  |_     \n';
-    output += '  |    |_/ __ \\|  |  /    \\_/ __ \\   __\\ \n';
-    output += '  |    |\\  ___/|  |_|   |  \\  ___/|  |     \n';
-    output += '  |____| \\___  >____/___|  /\\___  >__|     \n';
-    output += '             \\/          \\/     \\/        \n';
+    output += '___________    .__                 __                \n';
+    output += '\\__    ___/___ |  |   ____   _____/  |_             \n';
+    output += '  |    |_/ __ \\|  |  /    \\_/ __ \\   __\\         \n';
+    output += '  |    |\\  ___/|  |_|   |  \\  ___/|  |             \n';
+    output += '  |____| \\___  >____/___|  /\\___  >__|             \n';
+    output += `             \\/          \\/     \\/     --- H AC CD\n`;
     console.log(output);
 }
 
@@ -29,7 +29,7 @@ program.parse(process.argv);
 let devices = {
     type: 'list',
     name: 'device',
-    message: 'Which devic do you want to connect',
+    message: `Which devic do you(${program.user}) want to connect?`,
     askAnswered: true,
     choices: [
         'sw1',
@@ -41,13 +41,15 @@ let devices = {
 let killdev = {
     type: 'rawlist',
     name: 'killdev',
-    message: 'Please select kill device',
+    message: 'Please select the device to kick out!',
     askAnswered: true,
     choices: [
         'sw1',
         'sw2'
     ]
 }
+
+let ptyProcess = null;
 
 let prompts = new Subject();
 
@@ -78,8 +80,8 @@ obv.ui.process.subscribe(function (answer) {
 });
 
 obv.ui.rl.listeners("SIGINT").forEach(listener => obv.ui.rl.off("SIGINT", listener));
-obv.ui.rl.on("SIGINT", () => {});
-obv.ui.rl.on("SIGTSTP", () => {});
+obv.ui.rl.on("SIGINT", () => { });
+obv.ui.rl.on("SIGTSTP", () => { });
 
 obv.ui.rl.output.write(ansiEscapes.eraseLines(200));
 welcome();
@@ -87,7 +89,7 @@ prompts.next(devices);
 
 function connect(name) {
 
-    let ptyProcess = pty.spawn('telnet', [configs[name]], {
+    ptyProcess = pty.spawn('telnet', [configs[name]], {
         name: 'xterm-color',
         cols: 80,
         rows: 30,
@@ -96,6 +98,8 @@ function connect(name) {
     });
 
     ptyProcess.on('exit', function () {
+        console.log('exited')
+        ptyProcess = null;
         obv.ui.rl.output.unmute();
         obv.ui.rl.output.write(ansiEscapes.eraseLines(200));
         welcome();
@@ -105,16 +109,22 @@ function connect(name) {
     ptyProcess.on('data', function (data) {
         process.stdout.write(data);
     });
-
-    // attach handler to restore on exit
-    process.on('exit', function () {
-        
-    });
-
-    // attach readHandler with program logic
-    process.stdin.on('data', function (data) {   
-        const s_data = data.toString();
-        ptyProcess.write(s_data);
-    });
 }
+
+// attach handler to restore on exit
+process.on('exit', function () {
+    obv.ui.close();
+});
+
+// attach readHandler with program logic
+process.stdin.on('data', function (data) {
+    const s_data = data.toString();
+    if (ptyProcess) {
+        if (s_data === '\x03') {
+            ptyProcess.kill("SIGINT");
+        } else {
+            ptyProcess.write(s_data);
+        }
+    }
+});
 
