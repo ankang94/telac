@@ -1,0 +1,53 @@
+#!/bin/bash
+
+TELAC_INSTALLPATH='/opt/telac'
+
+if [ `id -u` -ne 0 ]; then
+    echo "This script must be run as root."
+    exit 1
+fi
+
+[ -d ${TELAC_INSTALLPATH} ] && \rm -rf ${TELAC_INSTALLPATH}
+mkdir -p ${TELAC_INSTALLPATH}
+
+srcdir=$(cd `dirname $0`; pwd)
+
+[ -d /usr/local/bin ] || mkdir -p /usr/local/bin
+[ -d /usr/local/lib ] || mkdir -p /usr/local/lib
+[ -d /usr/local/include ] || mkdir -p /usr/local/include
+
+[ -e /usr/local/bin/node ] && \rm -rf /usr/local/bin/node
+[ -e /usr/local/bin/npm ] && \rm -rf /usr/local/bin/npm
+[ -e /usr/local/lib/node_modules ] && \rm -rf /usr/local/lib/node_modules
+[ -e /usr/local/include/node ] && \rm -rf /usr/local/include/node
+
+tar xzf "${srcdir}/node-v10.19.0-linux-x64.tar.gz" -C ${TELAC_INSTALLPATH} || exit 1
+tar xzf "${srcdir}/node_modules.tar.gz" -C ${srcdir}/main || exit 1
+\mv -f ${TELAC_INSTALLPATH}/node-v10.19.0-linux-x64 ${TELAC_INSTALLPATH}/node
+ln -sf ${TELAC_INSTALLPATH}/node/bin/{node,npm} /usr/local/bin/
+ln -sf ${TELAC_INSTALLPATH}/node/lib/node_modules /usr/local/lib/
+ln -sf ${TELAC_INSTALLPATH}/node/include/node /usr/local/include/
+
+\cp -rf ${srcdir}/main ${TELAC_INSTALLPATH}
+
+echo "# telac server
+[Unit]
+Type=forking
+Description=telac server
+ConditionDirectoryNotEmpty=${TELAC_INSTALLPATH}/main
+PIDFile=/run/telac.pid
+
+[Service]
+WorkingDirectory=${TELAC_INSTALLPATH}/main
+ExecStartPre=/bin/which node npm
+ExecStart=/bin/nohup npm start
+KillMode=process
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+" > /usr/lib/systemd/system/telac.service 
+systemctl enable telac.service
+systemctl start telac.service
+
+echo "telac install successfully."
